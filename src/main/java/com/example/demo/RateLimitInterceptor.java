@@ -1,5 +1,6 @@
 package com.example.demo;
 
+import jakarta.annotation.PreDestroy;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Value;
@@ -51,7 +52,8 @@ public class RateLimitInterceptor implements HandlerInterceptor {
     private String getClientIp(HttpServletRequest request) {
         String xForwardedFor = request.getHeader("X-Forwarded-For");
         if (xForwardedFor != null && !xForwardedFor.isBlank()) {
-            String firstIp = xForwardedFor.split(",")[0].strip();
+            int commaIndex = xForwardedFor.indexOf(',');
+            String firstIp = (commaIndex >= 0 ? xForwardedFor.substring(0, commaIndex) : xForwardedFor).strip();
             if (!firstIp.isEmpty()) {
                 return firstIp;
             }
@@ -61,6 +63,19 @@ public class RateLimitInterceptor implements HandlerInterceptor {
             return xRealIp.strip();
         }
         return request.getRemoteAddr();
+    }
+
+    @PreDestroy
+    public void shutdown() {
+        cleanupExecutor.shutdown();
+        try {
+            if (!cleanupExecutor.awaitTermination(5, TimeUnit.SECONDS)) {
+                cleanupExecutor.shutdownNow();
+            }
+        } catch (InterruptedException e) {
+            cleanupExecutor.shutdownNow();
+            Thread.currentThread().interrupt();
+        }
     }
 
     private void removeExpiredEntries() {
