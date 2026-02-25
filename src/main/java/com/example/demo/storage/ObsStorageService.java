@@ -7,6 +7,7 @@ import org.springframework.beans.factory.DisposableBean;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -37,6 +38,12 @@ public class ObsStorageService implements StorageService, DisposableBean {
         this.bucketName = bucketName;
     }
 
+    /** Package-visible constructor for testing — accepts a pre-built ObsClient. */
+    ObsStorageService(ObsClient obsClient, String bucketName) {
+        this.obsClient = obsClient;
+        this.bucketName = bucketName;
+    }
+
     @Override
     public String store(MultipartFile file) {
         String originalFilename = file.getOriginalFilename();
@@ -44,31 +51,33 @@ public class ObsStorageService implements StorageService, DisposableBean {
             originalFilename = "upload";
         }
         Path filenamePath = Paths.get(originalFilename).getFileName();
-        String safeFilename = sanitizeFilename(filenamePath != null ? filenamePath.toString() : "upload");
+        String safeFilename = StorageUtils.sanitizeFilename(filenamePath != null ? filenamePath.toString() : "upload");
         String objectKey = UUID.randomUUID() + "_" + safeFilename;
 
-        PutObjectRequest request = new PutObjectRequest(bucketName, objectKey);
         ObjectMetadata metadata = new ObjectMetadata();
         metadata.setContentLength(file.getSize());
+        String contentType = file.getContentType();
+        if (contentType != null && !contentType.isBlank()) {
+            metadata.setContentType(contentType);
+        }
+
+        PutObjectRequest request = new PutObjectRequest(bucketName, objectKey);
         request.setMetadata(metadata);
-        try {
-            request.setInput(file.getInputStream());
+        try (InputStream inputStream = file.getInputStream()) {
+            request.setInput(inputStream);
+            try {
+                obsClient.putObject(request);
+            } catch (RuntimeException e) {
+                throw new UncheckedIOException("Failed to upload file to OBS", new IOException(e.getMessage(), e));
+            }
         } catch (IOException e) {
             throw new UncheckedIOException("Failed to read uploaded file", e);
         }
-        obsClient.putObject(request);
         return objectKey;
     }
 
     @Override
     public void destroy() throws Exception {
         obsClient.close();
-    }
-
-    private static String sanitizeFilename(String filename) {
-        if (filename.indexOf('\0') >= 0) {
-            throw new IllegalArgumentException("Filename contains invalid characters");
-        }
-        return filename.replaceAll("[^\\w.\\-]", "_");
     }
 }

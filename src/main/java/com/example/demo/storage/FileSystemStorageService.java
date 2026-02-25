@@ -34,7 +34,7 @@ public class FileSystemStorageService implements StorageService {
             originalFilename = "upload";
         }
         Path filenamePath = Paths.get(originalFilename).getFileName();
-        String safeFilename = sanitizeFilename(filenamePath != null ? filenamePath.toString() : "upload");
+        String safeFilename = StorageUtils.sanitizeFilename(filenamePath != null ? filenamePath.toString() : "upload");
         String storedFilename = UUID.randomUUID() + "_" + safeFilename;
 
         Path targetPath = baseDir.resolve(storedFilename).normalize();
@@ -48,12 +48,5 @@ public class FileSystemStorageService implements StorageService {
             throw new UncheckedIOException("Failed to store file: " + storedFilename, e);
         }
         return storedFilename;
-    }
-
-    private static String sanitizeFilename(String filename) {
-        if (filename.indexOf('\0') >= 0) {
-            throw new IllegalArgumentException("Filename contains invalid characters");
-        }
-        return filename.replaceAll("[^\\w.\\-]", "_");
     }
 }

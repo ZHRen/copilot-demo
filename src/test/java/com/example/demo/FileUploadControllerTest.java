@@ -6,6 +6,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -15,6 +16,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(FileUploadController.class)
+@TestPropertySource(properties = "app.storage.max-file-size-bytes=1024")
 class FileUploadControllerTest {
 
     @Autowired
@@ -46,6 +48,16 @@ class FileUploadControllerTest {
     }
 
     @Test
+    void uploadFileTooLargeRejected() throws Exception {
+        byte[] oversized = new byte[2048]; // exceeds the 1024 byte limit set in @TestPropertySource
+        MockMultipartFile file = new MockMultipartFile("file", "big.txt", "text/plain", oversized);
+
+        mockMvc.perform(multipart("/api/files/upload").file(file))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").exists());
+    }
+
+    @Test
     void uploadFileStorageFailureReturns500() throws Exception {
         when(storageService.store(any())).thenThrow(new java.io.UncheckedIOException(
                 "disk full", new java.io.IOException("disk full")));
@@ -60,7 +72,8 @@ class FileUploadControllerTest {
 
     @Test
     void uploadFileIllegalArgumentReturns400() throws Exception {
-        when(storageService.store(any())).thenThrow(new IllegalArgumentException("Filename contains invalid characters"));
+        when(storageService.store(any())).thenThrow(
+                new IllegalArgumentException("Filename contains invalid characters"));
 
         MockMultipartFile file = new MockMultipartFile(
                 "file", "bad\0file.txt", "text/plain", "hello".getBytes());
@@ -68,5 +81,18 @@ class FileUploadControllerTest {
         mockMvc.perform(multipart("/api/files/upload").file(file))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error").value("Filename contains invalid characters"));
+    }
+
+    @Test
+    void uploadFileWithPathTraversalFilenameReturns400() throws Exception {
+        when(storageService.store(any())).thenThrow(
+                new IllegalArgumentException("Invalid filename: ../../../etc/passwd"));
+
+        MockMultipartFile file = new MockMultipartFile(
+                "file", "../../../etc/passwd", "text/plain", "secret".getBytes());
+
+        mockMvc.perform(multipart("/api/files/upload").file(file))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").exists());
     }
 }

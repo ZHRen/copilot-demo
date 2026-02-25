@@ -1,6 +1,7 @@
 package com.example.demo;
 
 import com.example.demo.storage.StorageService;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -18,15 +19,22 @@ import java.util.Map;
 public class FileUploadController {
 
     private final StorageService storageService;
+    private final long maxFileSizeBytes;
 
-    public FileUploadController(StorageService storageService) {
+    public FileUploadController(StorageService storageService,
+            @Value("${app.storage.max-file-size-bytes:104857600}") long maxFileSizeBytes) {
         this.storageService = storageService;
+        this.maxFileSizeBytes = maxFileSizeBytes;
     }
 
     @PostMapping(value = "/files/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<Map<String, String>> uploadFile(@RequestParam("file") MultipartFile file) {
         if (file.isEmpty()) {
             return ResponseEntity.badRequest().body(Map.of("error", "File must not be empty"));
+        }
+        if (file.getSize() > maxFileSizeBytes) {
+            return ResponseEntity.badRequest().body(Map.of("error",
+                    "File size exceeds the maximum allowed limit of " + maxFileSizeBytes + " bytes"));
         }
 
         String storedName = storageService.store(file);

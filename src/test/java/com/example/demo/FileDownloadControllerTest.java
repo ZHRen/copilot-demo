@@ -15,7 +15,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(FileDownloadController.class)
-@TestPropertySource(properties = "app.upload-dir=${java.io.tmpdir}/copilot-demo-test-uploads")
+@TestPropertySource(properties = "app.storage.local.base-dir=${java.io.tmpdir}/copilot-demo-test-uploads")
 class FileDownloadControllerTest {
 
     @TempDir
