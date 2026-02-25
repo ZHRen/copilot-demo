@@ -15,7 +15,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(FileDownloadController.class)
-@TestPropertySource(properties = "app.upload-dir=${java.io.tmpdir}/copilot-demo-test-uploads")
+@TestPropertySource(properties = {
+        "app.upload-dir=${java.io.tmpdir}/copilot-demo-test-uploads",
+        "app.download.rate-limit=10"
+})
 class FileDownloadControllerTest {
 
     @TempDir
@@ -49,5 +52,25 @@ class FileDownloadControllerTest {
         } finally {
             Files.deleteIfExists(testFile);
         }
+    }
+
+    @Test
+    void downloadFileRateLimited() throws Exception {
+        // Use a separate test with rate-limit=1 via a nested class would be cleaner,
+        // but here we exhaust the bucket for a unique IP by using a custom rate-limit=1 controller instance.
+        FileDownloadController controller = new FileDownloadController(
+                System.getProperty("java.io.tmpdir") + "/copilot-demo-test-uploads", 1);
+
+        // First call should be allowed (consumes the single token)
+        org.springframework.mock.web.MockHttpServletRequest request =
+                new org.springframework.mock.web.MockHttpServletRequest();
+        request.setRemoteAddr("192.168.1.100");
+        var first = controller.downloadFile("nonexistent.txt", request);
+        // 404 because file doesn't exist, not 429
+        org.junit.jupiter.api.Assertions.assertEquals(404, first.getStatusCode().value());
+
+        // Second call should be rate-limited (429)
+        var second = controller.downloadFile("nonexistent.txt", request);
+        org.junit.jupiter.api.Assertions.assertEquals(429, second.getStatusCode().value());
     }
 }
