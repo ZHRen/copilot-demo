@@ -33,7 +33,8 @@ public class FileSystemStorageService implements StorageService {
         if (originalFilename == null || originalFilename.isBlank()) {
             originalFilename = "upload";
         }
-        String safeFilename = sanitizeFilename(Paths.get(originalFilename).getFileName().toString());
+        Path filenamePath = Paths.get(originalFilename).getFileName();
+        String safeFilename = sanitizeFilename(filenamePath != null ? filenamePath.toString() : "upload");
         String storedFilename = UUID.randomUUID() + "_" + safeFilename;
 
         Path targetPath = baseDir.resolve(storedFilename).normalize();

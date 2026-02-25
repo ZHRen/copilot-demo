@@ -54,6 +54,19 @@ class FileUploadControllerTest {
                 "file", "test.txt", "text/plain", "hello".getBytes());
 
         mockMvc.perform(multipart("/api/files/upload").file(file))
-                .andExpect(status().isInternalServerError());
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.error").value("Storage error occurred"));
+    }
+
+    @Test
+    void uploadFileIllegalArgumentReturns400() throws Exception {
+        when(storageService.store(any())).thenThrow(new IllegalArgumentException("Filename contains invalid characters"));
+
+        MockMultipartFile file = new MockMultipartFile(
+                "file", "bad\0file.txt", "text/plain", "hello".getBytes());
+
+        mockMvc.perform(multipart("/api/files/upload").file(file))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("Filename contains invalid characters"));
     }
 }

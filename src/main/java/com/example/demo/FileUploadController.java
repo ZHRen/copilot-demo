@@ -33,8 +33,13 @@ public class FileUploadController {
         return ResponseEntity.ok(Map.of("filename", storedName));
     }
 
-    @ExceptionHandler({UncheckedIOException.class, RuntimeException.class})
-    public ResponseEntity<Map<String, String>> handleStorageError(RuntimeException ex) {
-        return ResponseEntity.internalServerError().body(Map.of("error", ex.getMessage()));
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<Map<String, String>> handleInvalidArgument(IllegalArgumentException ex) {
+        return ResponseEntity.badRequest().body(Map.of("error", ex.getMessage()));
+    }
+
+    @ExceptionHandler(UncheckedIOException.class)
+    public ResponseEntity<Map<String, String>> handleStorageError(UncheckedIOException ex) {
+        return ResponseEntity.internalServerError().body(Map.of("error", "Storage error occurred"));
     }
 }

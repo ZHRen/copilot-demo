@@ -4,6 +4,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+import java.util.Locale;
+
 /**
  * Creates the appropriate {@link StorageService} bean based on {@code app.storage.type}.
  * Supported values: {@code local}, {@code nas}, {@code obs}.
@@ -34,7 +36,7 @@ public class StorageConfig {
 
     @Bean
     public StorageService storageService() {
-        return switch (storageType.toLowerCase()) {
+        return switch (storageType.toLowerCase(Locale.ROOT)) {
             case "nas" -> {
                 if (nasBaseDir == null || nasBaseDir.isBlank()) {
                     throw new IllegalArgumentException(

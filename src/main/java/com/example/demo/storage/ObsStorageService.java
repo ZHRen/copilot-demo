@@ -1,12 +1,14 @@
 package com.example.demo.storage;
 
 import com.obs.services.ObsClient;
+import com.obs.services.model.ObjectMetadata;
 import com.obs.services.model.PutObjectRequest;
 import org.springframework.beans.factory.DisposableBean;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.UUID;
 
@@ -41,10 +43,14 @@ public class ObsStorageService implements StorageService, DisposableBean {
         if (originalFilename == null || originalFilename.isBlank()) {
             originalFilename = "upload";
         }
-        String safeFilename = sanitizeFilename(Paths.get(originalFilename).getFileName().toString());
+        Path filenamePath = Paths.get(originalFilename).getFileName();
+        String safeFilename = sanitizeFilename(filenamePath != null ? filenamePath.toString() : "upload");
         String objectKey = UUID.randomUUID() + "_" + safeFilename;
 
         PutObjectRequest request = new PutObjectRequest(bucketName, objectKey);
+        ObjectMetadata metadata = new ObjectMetadata();
+        metadata.setContentLength(file.getSize());
+        request.setMetadata(metadata);
         try {
             request.setInput(file.getInputStream());
         } catch (IOException e) {
