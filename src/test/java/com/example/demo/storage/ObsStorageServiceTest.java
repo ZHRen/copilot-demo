@@ -1,13 +1,19 @@
 package com.example.demo.storage;
 
 import com.obs.services.ObsClient;
+import com.obs.services.model.ListObjectsRequest;
+import com.obs.services.model.ObjectListing;
+import com.obs.services.model.ObjectMetadata;
 import com.obs.services.model.PutObjectRequest;
+import com.obs.services.model.S3Object;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.mock.web.MockMultipartFile;
 
 import java.io.UncheckedIOException;
+import java.util.Date;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -101,5 +107,63 @@ class ObsStorageServiceTest {
         service.destroy();
 
         verify(mockObsClient, times(1)).close();
+    }
+
+    @Test
+    void searchReturnsAllObjectsWhenKeywordIsNull() {
+        ObjectListing listing = mock(ObjectListing.class);
+        when(listing.getObjectSummaries()).thenReturn(List.of(
+                buildS3Object("uuid1_alpha.txt", 100L),
+                buildS3Object("uuid2_beta.txt", 200L)));
+        when(mockObsClient.listObjects(any(com.obs.services.model.ListObjectsRequest.class))).thenReturn(listing);
+
+        List<FileInfo> results = service.search(null);
+
+        assertEquals(2, results.size());
+    }
+
+    @Test
+    void searchFiltersByKeywordCaseInsensitive() {
+        ObjectListing listing = mock(ObjectListing.class);
+        when(listing.getObjectSummaries()).thenReturn(List.of(
+                buildS3Object("uuid1_Report.csv", 512L),
+                buildS3Object("uuid2_image.png", 1024L)));
+        when(mockObsClient.listObjects(any(com.obs.services.model.ListObjectsRequest.class))).thenReturn(listing);
+
+        List<FileInfo> results = service.search("report");
+
+        assertEquals(1, results.size());
+        assertEquals("uuid1_Report.csv", results.get(0).filename());
+        assertEquals(512L, results.get(0).sizeBytes());
+    }
+
+    @Test
+    void searchReturnsEmptyListWhenNoMatch() {
+        ObjectListing listing = mock(ObjectListing.class);
+        when(listing.getObjectSummaries()).thenReturn(List.of(
+                buildS3Object("uuid1_document.pdf", 300L)));
+        when(mockObsClient.listObjects(any(com.obs.services.model.ListObjectsRequest.class))).thenReturn(listing);
+
+        List<FileInfo> results = service.search("nonexistent");
+
+        assertTrue(results.isEmpty());
+    }
+
+    @Test
+    void searchWrapsObsExceptionAsUncheckedIO() {
+        doThrow(new RuntimeException("OBS unavailable"))
+                .when(mockObsClient).listObjects(any(com.obs.services.model.ListObjectsRequest.class));
+
+        assertThrows(UncheckedIOException.class, () -> service.search(null));
+    }
+
+    private static S3Object buildS3Object(String key, long size) {
+        S3Object obj = new S3Object();
+        obj.setObjectKey(key);
+        ObjectMetadata meta = new ObjectMetadata();
+        meta.setContentLength(size);
+        meta.setLastModified(new Date());
+        obj.setMetadata(meta);
+        return obj;
     }
 }

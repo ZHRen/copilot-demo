@@ -8,7 +8,11 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
+import java.nio.file.attribute.BasicFileAttributes;
+import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
+import java.util.stream.Stream;
 
 /**
  * StorageService implementation for local filesystem and NAS (Network Attached Storage).
@@ -48,5 +52,37 @@ public class FileSystemStorageService implements StorageService {
             throw new UncheckedIOException("Failed to store file: " + storedFilename, e);
         }
         return storedFilename;
+    }
+
+    @Override
+    public List<FileInfo> search(String keyword) {
+        try (Stream<Path> files = Files.list(baseDir)) {
+            return files
+                    .filter(Files::isRegularFile)
+                    .filter(p -> matchesKeyword(p.getFileName().toString(), keyword))
+                    .map(this::toFileInfo)
+                    .toList();
+        } catch (IOException e) {
+            throw new UncheckedIOException("Failed to list files in storage directory", e);
+        }
+    }
+
+    private static boolean matchesKeyword(String filename, String keyword) {
+        if (keyword == null || keyword.isBlank()) {
+            return true;
+        }
+        return filename.toLowerCase(Locale.ROOT).contains(keyword.toLowerCase(Locale.ROOT));
+    }
+
+    private FileInfo toFileInfo(Path path) {
+        try {
+            BasicFileAttributes attrs = Files.readAttributes(path, BasicFileAttributes.class);
+            return new FileInfo(
+                    path.getFileName().toString(),
+                    attrs.size(),
+                    attrs.lastModifiedTime().toInstant().toString());
+        } catch (IOException e) {
+            throw new UncheckedIOException("Failed to read file attributes: " + path.getFileName(), e);
+        }
     }
 }

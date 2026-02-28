@@ -16,6 +16,6 @@ public class WebMvcConfig implements WebMvcConfigurer {
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
         registry.addInterceptor(rateLimitInterceptor)
-                .addPathPatterns("/api/files/download", "/api/files/upload");
+                .addPathPatterns("/api/files/download", "/api/files/upload", "/api/files");
     }
 }

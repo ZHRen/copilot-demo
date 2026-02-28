@@ -1,8 +1,11 @@
 package com.example.demo.storage;
 
 import com.obs.services.ObsClient;
+import com.obs.services.model.ListObjectsRequest;
+import com.obs.services.model.ObjectListing;
 import com.obs.services.model.ObjectMetadata;
 import com.obs.services.model.PutObjectRequest;
+import com.obs.services.model.S3Object;
 import org.springframework.beans.factory.DisposableBean;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -11,6 +14,8 @@ import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 
 /**
@@ -74,6 +79,34 @@ public class ObsStorageService implements StorageService, DisposableBean {
             throw new UncheckedIOException("Failed to read uploaded file", e);
         }
         return objectKey;
+    }
+
+    @Override
+    public List<FileInfo> search(String keyword) {
+        ListObjectsRequest request = new ListObjectsRequest(bucketName);
+        request.setMaxKeys(1000);
+        try {
+            ObjectListing listing = obsClient.listObjects(request);
+            return listing.getObjectSummaries().stream()
+                    .filter(obj -> matchesKeyword(obj.getObjectKey(), keyword))
+                    .map(obj -> {
+                        ObjectMetadata meta = obj.getMetadata();
+                        long size = meta.getContentLength() != null ? meta.getContentLength() : 0L;
+                        String modified = meta.getLastModified() != null
+                                ? meta.getLastModified().toInstant().toString() : "";
+                        return new FileInfo(obj.getObjectKey(), size, modified);
+                    })
+                    .toList();
+        } catch (RuntimeException e) {
+            throw new UncheckedIOException("Failed to list OBS objects", new IOException(e.getMessage(), e));
+        }
+    }
+
+    private static boolean matchesKeyword(String key, String keyword) {
+        if (keyword == null || keyword.isBlank()) {
+            return true;
+        }
+        return key.toLowerCase(Locale.ROOT).contains(keyword.toLowerCase(Locale.ROOT));
     }
 
     @Override

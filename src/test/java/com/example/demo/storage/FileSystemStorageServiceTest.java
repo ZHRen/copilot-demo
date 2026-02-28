@@ -8,6 +8,7 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -74,5 +75,53 @@ class FileSystemStorageServiceTest {
         String storedName = service.store(file);
 
         assertArrayEquals(content, Files.readAllBytes(tempDir.resolve(storedName)));
+    }
+
+    @Test
+    void searchReturnsAllFilesWhenKeywordIsNull() throws IOException {
+        FileSystemStorageService service = new FileSystemStorageService(tempDir.toString());
+        Files.writeString(tempDir.resolve("uuid1_alpha.txt"), "a");
+        Files.writeString(tempDir.resolve("uuid2_beta.txt"), "b");
+
+        List<FileInfo> results = service.search(null);
+
+        assertEquals(2, results.size());
+    }
+
+    @Test
+    void searchFiltersByKeywordCaseInsensitive() throws IOException {
+        FileSystemStorageService service = new FileSystemStorageService(tempDir.toString());
+        Files.writeString(tempDir.resolve("uuid1_Report.csv"), "data");
+        Files.writeString(tempDir.resolve("uuid2_image.png"), "img");
+
+        List<FileInfo> results = service.search("report");
+
+        assertEquals(1, results.size());
+        assertEquals("uuid1_Report.csv", results.get(0).filename());
+    }
+
+    @Test
+    void searchReturnsEmptyListWhenNoMatch() throws IOException {
+        FileSystemStorageService service = new FileSystemStorageService(tempDir.toString());
+        Files.writeString(tempDir.resolve("uuid1_document.pdf"), "doc");
+
+        List<FileInfo> results = service.search("nonexistent");
+
+        assertTrue(results.isEmpty());
+    }
+
+    @Test
+    void searchReturnsCorrectFileMetadata() throws IOException {
+        FileSystemStorageService service = new FileSystemStorageService(tempDir.toString());
+        byte[] content = "hello".getBytes();
+        Files.write(tempDir.resolve("uuid_file.txt"), content);
+
+        List<FileInfo> results = service.search(null);
+
+        assertEquals(1, results.size());
+        FileInfo info = results.get(0);
+        assertEquals("uuid_file.txt", info.filename());
+        assertEquals(content.length, info.sizeBytes());
+        assertNotNull(info.lastModified());
     }
 }
