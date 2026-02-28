@@ -23,7 +23,7 @@ public class FileDownloadController {
 
     private final Path uploadDir;
 
-    public FileDownloadController(@Value("${app.upload-dir:uploads}") String uploadDirPath) {
+    public FileDownloadController(@Value("${app.storage.local.base-dir:${app.upload-dir:uploads}}") String uploadDirPath) {
         this.uploadDir = Paths.get(uploadDirPath).toAbsolutePath().normalize();
     }
 
