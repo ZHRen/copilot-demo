@@ -29,7 +29,7 @@ public class FileDownloadController {
 
     @GetMapping("/files/download")
     public ResponseEntity<Resource> downloadFile(@RequestParam String filename) {
-        if (filename == null || filename.isBlank() || !filename.matches("[\\w.\\-]+")) {
+        if (!filename.matches("[\\w\\-]+(\\.[\\w\\-]+)*")) {
             return ResponseEntity.badRequest().build();
         }
 
